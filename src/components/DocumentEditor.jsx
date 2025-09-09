@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -8,10 +9,18 @@ import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 const DocumentEditor = () => {
   const { getCurrentUser } = useAuth();
   const currentUser = getCurrentUser();
+  const location = useLocation();
   const canEdit = currentUser?.role === 'teacher';
   
-  const [isEditorExpanded, setIsEditorExpanded] = useState(false);
-  const [markdownContent, setMarkdownContent] = useState(`# Welcome to EduSphere Document Editor
+  // Get document data from navigation state
+  const documentData = location.state || {};
+  const isEditing = documentData.isEditing || false;
+  const documentId = documentData.documentId;
+  const initialTitle = documentData.documentTitle || 'Untitled Document';
+  const initialContent = documentData.documentContent || '';
+  
+  const [isEditorExpanded, setIsEditorExpanded] = useState(isEditing);
+  const [markdownContent, setMarkdownContent] = useState(initialContent || `# Welcome to EduSphere Document Editor
 
 This is a sample Markdown document. You can edit this content in the left panel (if you have edit permissions).
 
@@ -63,7 +72,7 @@ console.log(greetUser('Teacher'));
 
 *Happy editing!*`);
 
-  const [documentTitle, setDocumentTitle] = useState('Sample Document');
+  const [documentTitle, setDocumentTitle] = useState(initialTitle);
   const [lastUpdated, setLastUpdated] = useState(new Date().toISOString());
   const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
   
