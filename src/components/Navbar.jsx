@@ -48,7 +48,7 @@ const Navbar = ({ user }) => {
                 marginRight: '8px'
               }} 
             />
-            
+
             <span style={{ color: colors.primary[600] }}>EduSphere</span>
           </a>
 
@@ -126,6 +126,8 @@ const Navbar = ({ user }) => {
                   Settings
                 </a>
                 <hr className="navbar-divider" />
+
+                {user ? (
                 <a 
                   className="navbar-item"
                   onClick={handleLogout}
@@ -134,6 +136,25 @@ const Navbar = ({ user }) => {
                   <i className="fas fa-sign-out-alt mr-2"></i>
                   Sign Out
                 </a>
+                ) : (
+                  <>
+                    <a 
+                      className="navbar-item"
+                      href="/login"
+                      style={{ cursor: 'pointer' }}
+                    >
+                      Sign In
+                    </a>
+
+                    <a 
+                      className="navbar-item"
+                      href="/signup"
+                      style={{ cursor: 'pointer' }}
+                    >
+                      Sign Up
+                    </a>
+                  </>
+                )}
               </div>
             </div>
           </div>
