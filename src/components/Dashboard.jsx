@@ -1,7 +1,19 @@
 import { useAuth } from '../contexts/AuthContext';
+import useDataFetch from '../hooks/useDataFetch';
+import UserService from '../services/userService';
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, userData, getCurrentUser } = useAuth();
+  
+  // Get current user data (from cache if available)
+  const currentUser = getCurrentUser();
+  
+  // Fetch dashboard data with caching
+  const { data: dashboardData, loading: dashboardLoading } = useDataFetch('/users/dashboard', {
+    cacheKey: 'dashboard-data',
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: false
+  });
 
   return (
     <div className="dashboard-page">
@@ -9,7 +21,7 @@ const Dashboard = () => {
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-primary mb-2">
-            Welcome back, {user?.first_name}!
+            Welcome back, {currentUser?.first_name || user?.first_name || 'User'}!
           </h1>
           <p className="text-lg text-secondary">
             Here's what's happening in your learning journey
@@ -25,7 +37,9 @@ const Dashboard = () => {
                   <i className="fas fa-book fa-2x text-primary"></i>
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Active Courses</h3>
-                <p className="text-3xl font-bold text-primary">3</p>
+                <p className="text-3xl font-bold text-primary">
+                  {dashboardLoading ? '...' : (dashboardData?.courses_count || 3)}
+                </p>
               </div>
             </div>
           </div>
@@ -37,7 +51,9 @@ const Dashboard = () => {
                   <i className="fas fa-tasks fa-2x text-success"></i>
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Assignments</h3>
-                <p className="text-3xl font-bold text-success">7</p>
+                <p className="text-3xl font-bold text-success">
+                  {dashboardLoading ? '...' : (dashboardData?.assignments_count || 7)}
+                </p>
               </div>
             </div>
           </div>
@@ -49,7 +65,9 @@ const Dashboard = () => {
                   <i className="fas fa-clock fa-2x text-warning"></i>
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Due This Week</h3>
-                <p className="text-3xl font-bold text-warning">2</p>
+                <p className="text-3xl font-bold text-warning">
+                  {dashboardLoading ? '...' : (dashboardData?.due_this_week || 2)}
+                </p>
               </div>
             </div>
           </div>

@@ -4,6 +4,8 @@ import Navbar from './components/Navbar';
 import SignupForm from './components/SignupForm';
 import LoginForm from './components/LoginForm';
 import Dashboard from './components/Dashboard';
+import Documents from './components/Documents';
+import DocumentEditor from './components/DocumentEditor';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function AppContent() {
@@ -28,6 +30,22 @@ function AppContent() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/editor" 
+              element={
+                <ProtectedRoute>
+                  <DocumentEditor />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/my-documents" 
+              element={
+                <ProtectedRoute>
+                  <Documents />
                 </ProtectedRoute>
               } 
             />

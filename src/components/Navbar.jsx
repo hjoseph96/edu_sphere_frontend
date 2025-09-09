@@ -4,7 +4,10 @@ import { colors } from '../colors';
 import logo from '../assets/edu_sphere_logo.png';
 
 const Navbar = ({ user }) => {
-  const { logout } = useAuth();
+  const { logout, getCurrentUser } = useAuth();
+  
+  // Get current user data (from cache if available)
+  const currentUser = getCurrentUser();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const toggleMenu = () => {
@@ -24,7 +27,8 @@ const Navbar = ({ user }) => {
       style={{ 
         backgroundColor: colors.surface,
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        borderBottom: `1px solid ${colors.border.light}`
+        borderBottom: `1px solid ${colors.border.light}`,
+        padding: '14px 0'
       }}
     >
       <div className="container">
@@ -67,38 +71,40 @@ const Navbar = ({ user }) => {
 
         <div className={`navbar-menu ${isMenuOpen ? 'is-active' : ''}`}>
           <div className="navbar-start">
-            <a 
-              className="navbar-item" 
-              href="/dashboard"
-              style={{ color: colors.text.primary }}
-            >
-              <i className="fas fa-home mr-2"></i>
-              Dashboard
-            </a>
-            <a 
-              className="navbar-item" 
-              href="/courses"
-              style={{ color: colors.text.primary }}
-            >
-              <i className="fas fa-book mr-2"></i>
-              Courses
-            </a>
-            <a 
-              className="navbar-item" 
-              href="/assignments"
-              style={{ color: colors.text.primary }}
-            >
-              <i className="fas fa-tasks mr-2"></i>
-              Assignments
-            </a>
-            <a 
-              className="navbar-item" 
-              href="/grades"
-              style={{ color: colors.text.primary }}
-            >
-              <i className="fas fa-chart-line mr-2"></i>
-              Grades
-            </a>
+            { currentUser?.role === 'teacher' && (
+              <>
+                <a 
+                  className="navbar-item" 
+                  href="/my-documents"
+                  style={{ color: colors.text.primary }}
+                >
+                  <i className="fas fa-book mr-2"></i>
+                  Documents
+                </a>
+              </>
+            )}
+
+            { currentUser?.role === 'student' && (
+              <>
+                <a 
+                  className="navbar-item" 
+                  href="/dashboard"
+                  style={{ color: colors.text.primary }}
+                >
+                  <i className="fas fa-home mr-2"></i>
+                  Dashboard
+                </a>
+
+                <a 
+                  className="navbar-item" 
+                  href="/my-courses"
+                  style={{ color: colors.text.primary }}
+                >
+                  <i className="fas fa-book mr-2"></i>
+                  My Courses
+                </a>
+              </>
+            )}
           </div>
 
           <div className="navbar-end">
@@ -108,23 +114,9 @@ const Navbar = ({ user }) => {
                 style={{ color: colors.text.primary }}
               >
                 <i className="fas fa-user mr-2"></i>
-                {user?.first_name} {user?.last_name}
+                {currentUser?.first_name || user?.first_name} {currentUser?.last_name || user?.last_name}
               </a>
               <div className="navbar-dropdown is-right">
-                <a 
-                  className="navbar-item"
-                  href="/profile"
-                >
-                  <i className="fas fa-user-circle mr-2"></i>
-                  Profile
-                </a>
-                <a 
-                  className="navbar-item"
-                  href="/settings"
-                >
-                  <i className="fas fa-cog mr-2"></i>
-                  Settings
-                </a>
                 <hr className="navbar-divider" />
 
                 {user ? (

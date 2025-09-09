@@ -15,15 +15,30 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [userData, setUserData] = useState(null);
 
   // Check if user is logged in on app start
   useEffect(() => {
     const token = localStorage.getItem('token');
+    const storedUserData = localStorage.getItem('userData');
+    
     if (token) {
       // Set the token in axios defaults
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      // You might want to add a token verification endpoint here
-      setUser({ token });
+      
+      if (storedUserData) {
+        try {
+          const parsedUserData = JSON.parse(storedUserData);
+          setUser({ ...parsedUserData, token });
+          setUserData(parsedUserData);
+        } catch (err) {
+          console.warn('Failed to parse stored user data:', err);
+          // Clear invalid data
+          localStorage.removeItem('userData');
+        }
+      } else {
+        setUser({ token });
+      }
     }
     setLoading(false);
   }, []);
@@ -39,13 +54,15 @@ export const AuthProvider = ({ children }) => {
 
       const { user: userInfo, token } = response.data;
       
-      // Store token in localStorage
+      // Store token and user data in localStorage
       localStorage.setItem('token', token);
+      localStorage.setItem('userData', JSON.stringify(userInfo));
       
       // Set default authorization header
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       setUser({ ...userInfo, token });
+      setUserData(userInfo);
       return { success: true, data: userInfo };
     } catch (err) {
       let errorMessage = 'Login failed. Please try again.';
@@ -84,13 +101,15 @@ export const AuthProvider = ({ children }) => {
 
       const { user: userInfo, token } = response.data;
       
-      // Store token in localStorage
+      // Store token and user data in localStorage
       localStorage.setItem('token', token);
+      localStorage.setItem('userData', JSON.stringify(userInfo));
       
       // Set default authorization header
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       setUser({ ...userInfo, token });
+      setUserData(userInfo);
       return { success: true, data: userInfo };
     } catch (err) {
       let errorMessage = 'Signup failed. Please try again.';
@@ -120,19 +139,37 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('userData');
     delete api.defaults.headers.common['Authorization'];
     setUser(null);
+    setUserData(null);
     setError(null);
+  };
+
+  // Function to update user data locally
+  const updateUserData = (newUserData) => {
+    const updatedData = { ...userData, ...newUserData };
+    setUserData(updatedData);
+    setUser(prev => ({ ...prev, ...newUserData }));
+    localStorage.setItem('userData', JSON.stringify(updatedData));
+  };
+
+  // Function to get user data without API call
+  const getCurrentUser = () => {
+    return userData || user;
   };
 
   const value = {
     user,
+    userData,
     login,
     signup,
     logout,
     loading,
     error,
-    setError
+    setError,
+    updateUserData,
+    getCurrentUser
   };
 
   return (
