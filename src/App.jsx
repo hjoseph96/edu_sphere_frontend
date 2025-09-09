@@ -28,9 +28,17 @@ function AppContent() {
             <Route 
               path="/dashboard" 
               element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
+                user ? (
+                  user.role === 'teacher' ? (
+                    <Navigate to="/my-documents" replace />
+                  ) : (
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  )
+                ) : (
+                  <Navigate to="/login" replace />
+                )
               } 
             />
             <Route 
