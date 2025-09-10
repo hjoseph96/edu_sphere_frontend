@@ -55,6 +55,23 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+.modal-card-head, .modal-card-body {
+  background-color: whitesmoke;
+  color: black;
+}
+
+.modal-card-title {
+  color: black;
+}
+
+.modal .box { background-color: slategray; }
+
+form .select select { background-color: slategray; }
+
+.control .select::after { border-color: white; }
+
+
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

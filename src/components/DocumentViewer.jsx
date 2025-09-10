@@ -21,6 +21,7 @@ const DocumentViewer = () => {
   const [analytics, setAnalytics] = useState(null);
   const [error, setError] = useState('');
   const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
+  const [currentlyViewingUsers, setCurrentlyViewingUsers] = useState([]);
   
   // Mock data for users currently viewing/editing
   const [viewingUsers] = useState([

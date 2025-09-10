@@ -105,6 +105,42 @@
   padding: var(--space-6);
 }
 
+.dropdown-content .search-results .invite-btn {
+  background-color: transparent;
+  border: 2px solid var(--bulma-arrow-color);
+  width: 60px;
+  text-align: center;
+  border-radius: 5px;
+}
+
+#share-dropdown-menu .control input {
+  background: darkgrey;
+  font-weight: 600;
+}
+
+.modal-card-head button.delete::after, .modal-card-head button.delete::before {
+  content: none;
+}
+
+.modal-card-head button.delete {
+  justify-content: center;
+}
+
+.modal-card-head button.delete i {
+  position: relative;
+  top: -8px;
+  color: whitesmoke;
+}
+
+.control .button[type="submit"] {
+  color: white;
+}
+
+.menu-list li {
+  padding: 1em;
+  border-bottom: 1px solid gray;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .main-content {

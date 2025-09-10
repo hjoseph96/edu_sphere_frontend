@@ -5,6 +5,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import api from '../api/axiosConfig';
+import InviteEditorModal from './InviteEditorModal';
 
 const DocumentEditor = () => {
   const { getCurrentUser } = useAuth();
@@ -20,61 +22,25 @@ const DocumentEditor = () => {
   const initialContent = documentData.documentContent || '';
   
   const [isEditorExpanded, setIsEditorExpanded] = useState(isEditing);
-  const [markdownContent, setMarkdownContent] = useState(initialContent || `# Welcome to EduSphere Document Editor
-
-This is a sample Markdown document. You can edit this content in the left panel (if you have edit permissions).
-
-## Features
-
-- **Real-time preview**: See your changes instantly
-- **Markdown support**: Full Markdown syntax support
-- **Code highlighting**: Syntax highlighting for code blocks
-- **Collaborative editing**: See who else is viewing the document
-
-## Code Example
-
-\`\`\`javascript
-function greetUser(name) {
-  return \`Hello, \${name}! Welcome to EduSphere.\`;
-}
-
-console.log(greetUser('Teacher'));
-\`\`\`
-
-## Lists
-
-### Unordered List
-- Item 1
-- Item 2
-- Item 3
-
-### Ordered List
-1. First item
-2. Second item
-3. Third item
-
-## Tables
-
-| Feature | Status | Description |
-|---------|--------|-------------|
-| Markdown | ✅ | Full support |
-| Code Highlighting | ✅ | Multiple languages |
-| Real-time Preview | ✅ | Instant updates |
-| Collaboration | ✅ | Multi-user support |
-
-## Links and Images
-
-[Visit EduSphere](https://edusphere.com)
-
-> This is a blockquote. It can contain important information or notes.
-
----
-
-*Happy editing!*`);
+  const [markdownContent, setMarkdownContent] = useState(initialContent || '');
 
   const [documentTitle, setDocumentTitle] = useState(initialTitle);
   const [lastUpdated, setLastUpdated] = useState(new Date().toISOString());
   const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
+  
+  // Search functionality
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchTimeout, setSearchTimeout] = useState(null);
+  
+  // Modal state
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  
+
+  const [documentEditors, setDocumentEditors] = useState([]);
+  const [currentlyViewingUsers, setCurrentlyViewingUsers] = useState([]);
   
   // Mock data for users currently viewing/editing
   const [viewingUsers] = useState([
@@ -85,6 +51,10 @@ console.log(greetUser('Teacher'));
   ]);
 
   const textareaRef = useRef(null);
+
+  useEffect(() => {
+    setDocumentEditors(documentData.documentEditors || []);
+  }, [documentEditors]);
 
   // No auto-resize needed - we want scrolling instead
 
@@ -113,12 +83,63 @@ console.log(greetUser('Teacher'));
     // You could add a toast notification here
   };
 
-  const shareOptions = [
-    { label: 'Copy Link', action: () => copyToClipboard(window.location.href) },
-    { label: 'Export PDF', action: () => console.log('Export PDF') },
-    { label: 'Export HTML', action: () => console.log('Export HTML') },
-    { label: 'Share via Email', action: () => console.log('Share via Email') }
-  ];
+  // Search functionality
+  const handleSearchChange = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+
+    // Clear existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    if (query.trim().length === 0) {
+      setSearchResults([]);
+      return;
+    }
+
+    // Set new timeout for debounced search
+    const newTimeout = setTimeout(() => {
+      performSearch(query);
+    }, 300); // 300ms delay
+
+    setSearchTimeout(newTimeout);
+  };
+
+  const performSearch = async (query) => {
+    try {
+      setSearchLoading(true);
+      const response = await api.get(`/users?query=${encodeURIComponent(query)}`);
+      setSearchResults(response.data.users || []);
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleInviteUser = (user) => {
+    setSelectedUser(user);
+    setInviteModalOpen(true);
+  };
+
+  const handleCloseInviteModal = (response) => {
+    setDocumentEditors(response.document_editors);
+
+
+    setInviteModalOpen(false);
+    setSelectedUser(null);
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTimeout]);
 
   const getShareIcon = (label) => {
     switch (label) {
@@ -149,6 +170,17 @@ console.log(greetUser('Teacher'));
                 <p className="text-sm text-secondary mt-1">
                   Last updated {formatLastUpdated(lastUpdated)}
                 </p>
+                {documentEditors.length > 0 && (
+                  <div className="text-sm text-secondary mt-1">
+                    <span className="font-bold">Editors:</span>
+                    {documentEditors.map((editor) => ( <img src={editor.avatar_url} alt={editor.first_name} className="user-avatar" /> ))}
+                    {documentEditors.length > 4 && (
+                      <div className="w-8 h-8 rounded-full bg-neutral-300 flex items-center justify-center text-neutral-600 text-xs font-medium border-2 border-white">
+                        +{documentEditors.length - 4}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -173,22 +205,68 @@ console.log(greetUser('Teacher'));
                   </button>
                 </div>
                 <div className="dropdown-menu" id="share-dropdown-menu" role="menu">
-                  <div className="dropdown-content">
-                    {shareOptions.map((option, index) => (
-                      <button
-                        key={index}
-                        className="dropdown-item button is-white is-fullwidth is-justify-content-flex-start"
-                        onClick={() => {
-                          option.action();
-                          setIsShareDropdownOpen(false);
-                        }}
-                      >
-                        <span className="icon is-small mr-2">
-                          <i className={`fas fa-${getShareIcon(option.label)}`}></i>
+                  <div className="dropdown-content" style={{ width: '400px', padding: '1rem' }}>
+                    {/* Search Input */}
+                    <div className="field">
+                      <div className="control has-icons-left">
+                        <input
+                          className="input"
+                          type="text"
+                          placeholder="Search users..."
+                          value={searchQuery}
+                          onChange={handleSearchChange}
+                        />
+                        <span className="icon is-left">
+                          <i className="fas fa-search"></i>
                         </span>
-                        {option.label}
-                      </button>
-                    ))}
+                      </div>
+                    </div>
+
+                    <hr className="my-3" />
+
+                    {/* Search Results */}
+                    <div className="search-results" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                      {searchLoading ? (
+                        <div className="has-text-centered py-4">
+                          <i className="fas fa-spinner fa-spin"></i>
+                          <span className="ml-2">Searching...</span>
+                        </div>
+                      ) : searchResults.length > 0 ? (
+                        <ul className="menu-list">
+                          {searchResults.map((user) => (
+                            <li key={user.id} className="is-flex is-justify-content-space-between is-align-items-center">
+                              <div className="is-flex is-align-items-left">
+                                <img src={user.avatar_url} alt={user.first_name} className="user-avatar" />
+                              </div>
+
+                              <div>
+                                <div className="has-text-weight-semibold">
+                                  {user.first_name} {user.last_name}
+                                </div>
+                                <div className="has-text-grey is-size-7">
+                                  {user.email}
+                                </div>
+                              </div>
+
+                              <button
+                                className="button is-small is-primary invite-btn"
+                                onClick={() => handleInviteUser(user)}
+                              >
+                                Invite
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : searchQuery.trim().length > 0 ? (
+                        <div className="has-text-centered py-4 has-text-grey">
+                          No users found
+                        </div>
+                      ) : (
+                        <div className="has-text-centered py-4 has-text-grey">
+                          Start typing to search for users
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -313,6 +391,14 @@ console.log(greetUser('Teacher'));
           onClick={() => setIsShareDropdownOpen(false)}
         />
       )}
+
+      {/* Invite Editor Modal */}
+      <InviteEditorModal
+        isOpen={inviteModalOpen}
+        onClose={handleCloseInviteModal}
+        user={selectedUser}
+        documentId={documentId}
+      />
     </div>
   );
 };

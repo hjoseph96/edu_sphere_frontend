@@ -790,6 +790,8 @@ img.logo {
 /* User Avatars */
 .user-avatar {
   transition: transform var(--transition-fast);
+  width: 33px;
+  border-radius: 100px;
 }
 
 .user-avatar:hover {

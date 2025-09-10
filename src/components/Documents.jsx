@@ -50,6 +50,7 @@ const Documents = () => {
           documentId: document.id,
           documentTitle: document.title,
           documentContent: documentContent,
+          documentEditors: document.editors,
           isEditing: true
         }
       });
