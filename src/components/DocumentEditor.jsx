@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -7,25 +7,24 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { tomorrow } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import api from '../api/axiosConfig';
 import InviteEditorModal from './InviteEditorModal';
+import LoadingIndicator from './LoadingIndicator';
 
 const DocumentEditor = () => {
   const { getCurrentUser } = useAuth();
   const currentUser = getCurrentUser();
+  const { document_id } = useParams();
   const location = useLocation();
   const canEdit = currentUser?.role === 'teacher';
   
-  // Get document data from navigation state
-  const documentData = location.state || {};
-  const isEditing = documentData.isEditing || false;
-  const documentId = documentData.documentId;
-  const initialTitle = documentData.documentTitle || 'Untitled Document';
-  const initialContent = documentData.documentContent || '';
+  // Document data state
+  const [document, setDocument] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   
-  const [isEditorExpanded, setIsEditorExpanded] = useState(isEditing);
-  const [markdownContent, setMarkdownContent] = useState(initialContent || '');
-
-  const [documentTitle, setDocumentTitle] = useState(initialTitle);
-  const [lastUpdated, setLastUpdated] = useState(new Date().toISOString());
+  const [isEditorExpanded, setIsEditorExpanded] = useState(false);
+  const [markdownContent, setMarkdownContent] = useState('');
+  const [documentTitle, setDocumentTitle] = useState('');
+  const [lastUpdated, setLastUpdated] = useState('');
   const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
   
   // Search functionality
@@ -42,6 +41,10 @@ const DocumentEditor = () => {
   const [documentEditors, setDocumentEditors] = useState([]);
   const [currentlyViewingUsers, setCurrentlyViewingUsers] = useState([]);
   
+  // Auto-save state
+  const [updateTimeout, setUpdateTimeout] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
   // Mock data for users currently viewing/editing
   const [viewingUsers] = useState([
     { id: 1, name: 'John Doe', avatar: 'JD', color: 'bg-blue-500' },
@@ -52,19 +55,69 @@ const DocumentEditor = () => {
 
   const textareaRef = useRef(null);
 
+  // Fetch document data on component mount
   useEffect(() => {
-    setDocumentEditors(documentData.documentEditors || []);
-  }, [documentEditors]);
+    if (document_id && document_id !== 'new') {
+      fetchDocument();
+    } else if (document_id === 'new') {
+      // Handle new document creation
+      setLoading(false);
+      setDocument({ title: 'Untitled Document', editors: [] });
+      setDocumentTitle('Untitled Document');
+      setMarkdownContent(document.markdown || '');
+      setLastUpdated(new Date().toISOString());
+      setDocumentEditors([]);
+      setIsEditorExpanded(canEdit);
+    }
+  }, [document_id]);
+
+  const fetchDocument = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await api.get(`/documents/${document_id}`);
+      
+      const documentData = response.data.document;
+      const fileContent = response.data.file || '';
+      
+      // Set document data
+      setDocument(documentData);
+      setDocumentTitle(documentData.title || 'Untitled Document');
+      setMarkdownContent(fileContent);
+      setLastUpdated(documentData.updated_at || documentData.created_at);
+      setDocumentEditors(documentData.editors || []);
+      
+      // Set editor expanded if user has edit permissions
+      setIsEditorExpanded(canEdit);
+      
+    } catch (error) {
+      console.error('Error fetching document:', error);
+      setError('Failed to load document');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // No auto-resize needed - we want scrolling instead
 
   const handleMarkdownChange = (e) => {
     setMarkdownContent(e.target.value);
     setLastUpdated(new Date().toISOString());
+    
+    // Auto-save document
+    if (document_id && document_id !== 'new') {
+      updateDocument();
+    }
   };
 
   const handleTitleChange = (e) => {
     setDocumentTitle(e.target.value);
+    setLastUpdated(new Date().toISOString());
+    
+    // Auto-save document
+    if (document_id && document_id !== 'new') {
+      updateDocument();
+    }
   };
 
   const formatLastUpdated = (dateString) => {
@@ -110,7 +163,21 @@ const DocumentEditor = () => {
     try {
       setSearchLoading(true);
       const response = await api.get(`/users?query=${encodeURIComponent(query)}`);
-      setSearchResults(response.data.users || []);
+
+      const results = response.data.users;
+
+      let filteredUsers = results;
+      // Filter out users that are already editors
+      if (documentEditors.length > 0)
+      {
+        filteredUsers = results.filter((user) => !documentEditors.some((editor) => editor.id === user.id));
+      }
+
+      // Filter out current user
+      filteredUsers = filteredUsers.filter((user) => user.id !== currentUser.id);
+
+      // Set search results
+      setSearchResults(filteredUsers || []);
     } catch (error) {
       console.error('Error searching users:', error);
       setSearchResults([]);
@@ -125,21 +192,58 @@ const DocumentEditor = () => {
   };
 
   const handleCloseInviteModal = (response) => {
-    setDocumentEditors(response.document_editors);
-
+    setDocumentEditors([...documentEditors, ...response.editors]);
 
     setInviteModalOpen(false);
     setSelectedUser(null);
   };
 
-  // Cleanup timeout on unmount
+  // Auto-save document with debouncing
+  const updateDocument = async () => {
+    // Clear existing timeout
+    if (updateTimeout) {
+      clearTimeout(updateTimeout);
+    }
+
+    // Set new timeout for debounced save
+    const newTimeout = setTimeout(async () => {
+      try {
+        setIsSaving(true);
+        
+        const payload = {
+          document: {
+            title: documentTitle,
+            markdown: markdownContent
+          }
+        };
+
+        await api.put(`/documents/${document_id}`, payload);
+        
+        // Update last updated time
+        setLastUpdated(new Date().toISOString());
+        
+      } catch (error) {
+        console.error('Error updating document:', error);
+        // You could add a toast notification here for error feedback
+      } finally {
+        setIsSaving(false);
+      }
+    }, 1000); // 1 second delay
+
+    setUpdateTimeout(newTimeout);
+  };
+
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (searchTimeout) {
         clearTimeout(searchTimeout);
       }
+      if (updateTimeout) {
+        clearTimeout(updateTimeout);
+      }
     };
-  }, [searchTimeout]);
+  }, [searchTimeout, updateTimeout]);
 
   const getShareIcon = (label) => {
     switch (label) {
@@ -151,6 +255,48 @@ const DocumentEditor = () => {
     }
   };
 
+  // Loading state
+  if (loading) {
+    return <LoadingIndicator size="large" text="Loading document..." />;
+  }
+
+  // Error state
+  if (error || !document) {
+    return (
+      <div className="document-editor">
+        <div className="document-header">
+          <div className="container">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center space-x-6">
+                <div>
+                  <h1 className="text-2xl font-bold text-primary">Document Not Found</h1>
+                  <p className="text-sm text-secondary mt-1">
+                    The document you're looking for doesn't exist or you don't have permission to view it.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="document-content">
+          <div className="flex h-screen">
+            <div className="w-full">
+              <div className="h-full overflow-y-auto bg-white">
+                <div className="p-8 max-w-4xl mx-auto text-center">
+                  <i className="fas fa-file-alt text-6xl text-neutral-400 mb-4"></i>
+                  <h2 className="text-2xl font-semibold text-primary mb-2">Document Not Found</h2>
+                  <p className="text-secondary mb-6">
+                    The document you're looking for doesn't exist or you don't have permission to view it.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="document-editor">
       {/* Header */}
@@ -158,8 +304,8 @@ const DocumentEditor = () => {
         <div className="container">
           <div className="flex justify-between items-center py-4">
             {/* Left side - Document details */}
-            <div className="flex items-center space-x-6">
-              <div>
+            <div className="flex items-center space-x-6 document-details">
+              <div className="document-title">
                 <input
                   type="text"
                   value={documentTitle}
@@ -169,16 +315,20 @@ const DocumentEditor = () => {
                 />
                 <p className="text-sm text-secondary mt-1">
                   Last updated {formatLastUpdated(lastUpdated)}
+                  {isSaving && (
+                    <span className="ml-2">
+                      <i className="fas fa-spinner fa-spin text-primary"></i>
+                      <span className="ml-1">Saving...</span>
+                    </span>
+                  )}
                 </p>
                 {documentEditors.length > 0 && (
-                  <div className="text-sm text-secondary mt-1">
+                  <div className="text-sm text-secondary mt-1 document-editors">
                     <span className="font-bold">Editors:</span>
-                    {documentEditors.map((editor) => ( <img src={editor.avatar_url} alt={editor.first_name} className="user-avatar" /> ))}
-                    {documentEditors.length > 4 && (
-                      <div className="w-8 h-8 rounded-full bg-neutral-300 flex items-center justify-center text-neutral-600 text-xs font-medium border-2 border-white">
-                        +{documentEditors.length - 4}
-                      </div>
-                    )}
+
+                    <div className="flex -space-x-2 editors">
+                      { documentEditors.map((editor) => ( <img src={editor.avatar_url} alt={editor.first_name} className="user-avatar" /> )) }
+                    </div>
                   </div>
                 )}
               </div>
@@ -233,29 +383,31 @@ const DocumentEditor = () => {
                         </div>
                       ) : searchResults.length > 0 ? (
                         <ul className="menu-list">
-                          {searchResults.map((user) => (
-                            <li key={user.id} className="is-flex is-justify-content-space-between is-align-items-center">
-                              <div className="is-flex is-align-items-left">
-                                <img src={user.avatar_url} alt={user.first_name} className="user-avatar" />
-                              </div>
-
-                              <div>
-                                <div className="has-text-weight-semibold">
-                                  {user.first_name} {user.last_name}
+                          {searchResults.map((user) => {
+                            return (
+                              <li key={user.id} className="is-flex is-justify-content-space-between is-align-items-center">
+                                <div className="is-flex is-align-items-left">
+                                  <img src={user.avatar_url} alt={user.first_name} className="user-avatar" />
                                 </div>
-                                <div className="has-text-grey is-size-7">
-                                  {user.email}
-                                </div>
-                              </div>
 
-                              <button
-                                className="button is-small is-primary invite-btn"
-                                onClick={() => handleInviteUser(user)}
-                              >
-                                Invite
-                              </button>
-                            </li>
-                          ))}
+                                <div>
+                                  <div className="has-text-weight-semibold">
+                                    {user.first_name} {user.last_name}
+                                  </div>
+                                  <div className="has-text-grey is-size-7">
+                                    {user.email}
+                                  </div>
+                                </div>
+
+                                <button
+                                  className="button is-small is-primary invite-btn"
+                                  onClick={() => handleInviteUser(user)}
+                                >
+                                  Invite
+                                </button>
+                              </li>
+                            );
+                          })}
                         </ul>
                       ) : searchQuery.trim().length > 0 ? (
                         <div className="has-text-centered py-4 has-text-grey">
@@ -374,6 +526,7 @@ const DocumentEditor = () => {
                         return <td {...props}>{children}</td>;
                       },
                     }}
+
                   >
                     {markdownContent}
                   </ReactMarkdown>
@@ -397,7 +550,7 @@ const DocumentEditor = () => {
         isOpen={inviteModalOpen}
         onClose={handleCloseInviteModal}
         user={selectedUser}
-        documentId={documentId}
+        documentId={document_id !== 'new' ? document_id : null}
       />
     </div>
   );

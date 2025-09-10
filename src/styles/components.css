@@ -462,7 +462,6 @@ img.logo {
 .document-content {
   flex: 1;
   overflow-y: scroll;
-  padding-bottom: 6rem;
 }
 
 .document-viewer h1, .document-viewer h2, .document-viewer h3, .document-viewer h4, .document-viewer h5, .document-viewer h6 {
@@ -720,6 +719,7 @@ img.logo {
 .document-editor .prose ol {
   margin: 1rem 0;
   padding-left: 2rem;
+  list-style: decimal
 }
 
 .document-editor .prose li {

@@ -41,13 +41,21 @@ function AppContent() {
                 )
               } 
             />
-            <Route 
-              path="/editor" 
+            <Route
+              path="/editor/:document_id"
               element={
                 <ProtectedRoute>
                   <DocumentEditor />
                 </ProtectedRoute>
-              } 
+              }
+            />
+            <Route
+              path="/editor/new"
+              element={
+                <ProtectedRoute>
+                  <DocumentEditor />
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/my-documents" 

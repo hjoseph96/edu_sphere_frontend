@@ -12,6 +12,7 @@ const Documents = () => {
   const fileInputRef = useRef(null);
   
   const [documents, setDocuments] = useState([]);
+  const [sharedDocuments, setSharedDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   
   const [isDragOver, setIsDragOver] = useState(false);
@@ -30,6 +31,7 @@ const Documents = () => {
       setLoading(true);
       const response = await api.get('/documents');
       setDocuments(response.data.documents || []);
+      setSharedDocuments(response.data.shared_documents || []);
     } catch (error) {
       console.error('Error fetching documents:', error);
       setUploadError('Failed to load documents');
@@ -39,25 +41,8 @@ const Documents = () => {
   };
 
   const handleEditDocument = async (document) => {
-    try {
-      // Fetch the document content
-      const response = await api.get(`/documents/${document.id}`);
-      const documentContent = response.data.file || '';
-      
-      // Navigate to DocumentEditor with the content
-      navigate('/editor', {
-        state: {
-          documentId: document.id,
-          documentTitle: document.title,
-          documentContent: documentContent,
-          documentEditors: document.editors,
-          isEditing: true
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching document content:', error);
-      setUploadError('Failed to load document content');
-    }
+    // Navigate to DocumentEditor with just the document ID
+    navigate(`/editor/${document.id}`);
   };
 
   const handleDownloadDocument = async (document) => {
@@ -250,8 +235,8 @@ const Documents = () => {
         setUploadError('');
       }
     } catch (error) {
-      debugger
       console.error('Error uploading documents:', error);
+
       if (error.response?.data?.errors) {
         setUploadError(error.response.data.errors.join(', '));
       } else {
@@ -295,13 +280,13 @@ const Documents = () => {
             <h1 className="text-4xl font-bold text-primary">
               My Documents
             </h1>
-            <a 
-              href="/editor" 
+            <button 
+              onClick={() => navigate('/editor/new')}
               className="btn btn-primary"
             >
               <i className="fas fa-plus mr-2"></i>
               New Document
-            </a>
+            </button>
           </div>
           <p className="text-lg text-secondary">
             Manage your teaching materials and course documents
@@ -391,6 +376,105 @@ const Documents = () => {
             ) : (
               <div className="space-y-3">
                 {documents.map((doc) => (
+                  <div 
+                    key={doc.id}
+                    className="document-item flex items-center justify-between p-4 rounded-lg hover:bg-neutral-50"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="flex-shrink-0">
+                        <i className="fas fa-file-alt text-2xl text-primary"></i>
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-primary">{doc.title}</h3>
+                        <div className="flex items-center space-x-4 text-sm text-secondary">
+                          {/* <span>{doc.size}</span> */}
+                          <span>•</span>
+                          <span>Uploaded {doc.created_at}</span>
+                          <span>•</span>
+                          <span className={`flex items-center`}>
+                            <i className={`mr-1`}></i>
+                            {doc.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      { doc.can_view && (
+                        <>
+                         <button 
+                          className="btn btn-outline btn-sm"
+                            onClick={() => navigate(`/viewer/${doc.id}`)}
+                          >
+                            <i className="fas fa-eye mr-1"></i>
+                            View
+                          </button>
+                          
+                          <button 
+                            className="btn btn-outline btn-sm"
+                            onClick={() => handleEditDocument(doc)}
+                          >
+                            <i className="fas fa-edit mr-1"></i>
+                            Edit
+                          </button>
+                        </>
+                       
+                      )}
+                      <button 
+                        className="btn btn-outline btn-sm"
+                        onClick={() => handleDownloadDocument(doc)}
+                        disabled={downloading === doc.id}
+                      >
+                        {downloading === doc.id ? (
+                          <i className="fas fa-spinner fa-spin mr-1"></i>
+                        ) : (
+                          <i className="fas fa-download mr-1"></i>
+                        )}
+                        {downloading === doc.id ? 'Downloading...' : 'Download'}
+                      </button>
+                      <button 
+                        className="btn btn-outline btn-sm text-error"
+                        onClick={() => handleDeleteDocument(doc)}
+                        disabled={deleting === doc.id}
+                      >
+                        {deleting === doc.id ? (
+                          <i className="fas fa-spinner fa-spin mr-1"></i>
+                        ) : (
+                          <i className="fas fa-trash mr-1"></i>
+                        )}
+                        {deleting === doc.id ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Shared Documents List */}
+        <div className="card">
+          <div className="card-header">
+            <h2 className="text-xl font-semibold text-primary">
+              Shared Documents ({sharedDocuments.length})
+            </h2>
+          </div>
+          <div className="card-body">
+            {loading ? (
+              <div className="text-center py-8">
+                <LoadingIndicator size="medium" text="Loading documents..." />
+              </div>
+            ) : sharedDocuments.length === 0 ? (
+              <div className="text-center py-8">
+                <i className="fas fa-file-alt text-4xl text-neutral-400 mb-4"></i>
+                <p className="text-lg text-secondary mb-2">No documents yet</p>
+                <p className="text-sm text-secondary">
+                  Upload your first Markdown document to get started
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sharedDocuments.map((doc) => (
                   <div 
                     key={doc.id}
                     className="document-item flex items-center justify-between p-4 rounded-lg hover:bg-neutral-50"

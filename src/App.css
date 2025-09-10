@@ -141,6 +141,29 @@
   border-bottom: 1px solid gray;
 }
 
+.document-editors {
+  display: inline-flex;
+  gap: 0.5em;
+}
+
+.document-editor .document-details {
+  width: 400px;
+}
+
+.document-editor .document-title {
+  width: 100%;
+}
+
+.document-editor .document-title input {
+  width: 100%;
+}
+
+.document-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .main-content {
