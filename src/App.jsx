@@ -5,7 +5,9 @@ import SignupForm from './components/SignupForm';
 import LoginForm from './components/LoginForm';
 import Dashboard from './components/Dashboard';
 import Documents from './components/Documents';
+import StudentDocuments from './components/StudentDocuments';
 import DocumentEditor from './components/DocumentEditor';
+import DocumentViewer from './components/DocumentViewer';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function AppContent() {
@@ -32,9 +34,7 @@ function AppContent() {
                   user.role === 'teacher' ? (
                     <Navigate to="/my-documents" replace />
                   ) : (
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
+                    <Navigate to="/documents" replace />
                   )
                 ) : (
                   <Navigate to="/login" replace />
@@ -54,6 +54,26 @@ function AppContent() {
               element={
                 <ProtectedRoute>
                   <Documents />
+                </ProtectedRoute>
+              } 
+            />
+            <Route
+              path="/documents" 
+              element={
+                user && user.role === 'student' ? (
+                  <ProtectedRoute>
+                    <StudentDocuments user={user} />
+                  </ProtectedRoute>
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              } 
+            />
+            <Route 
+              path="/viewer/:document_id" 
+              element={
+                <ProtectedRoute>
+                  <DocumentViewer />
                 </ProtectedRoute>
               } 
             />

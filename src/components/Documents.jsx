@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/axiosConfig';
+import pageViewService from '../services/pageViewService';
+import LoadingIndicator from './LoadingIndicator';
 
 const Documents = () => {
   const { getCurrentUser } = useAuth();
@@ -129,12 +131,12 @@ const Documents = () => {
   };
 
   const validateFile = (file) => {
-    const allowedExtensions = ['.md'];
+    const allowedExtensions = ['.md', '.pdf', '.docx', '.doc', '.txt', '.xls', '.xlsx', '.ppt', '.pptx'];
     const fileName = file.name.toLowerCase();
     const isValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
     
     if (!isValidExtension) {
-      setUploadError('Only Markdown (.md) files are allowed');
+      setUploadError('Only Markdown (.md), PDF (.pdf), DOCX (.docx), DOC (.doc), TXT (.txt), XLS (.xls), XLSX (.xlsx), PPT (.ppt), PPTX (.pptx) files are allowed');
       return false;
     }
     
@@ -156,7 +158,7 @@ const Documents = () => {
     const validFiles = files.filter(validateFile);
     
     if (validFiles.length === 0) {
-      setUploadError('Please upload only .md files');
+      setUploadError('Please upload only .md, .pdf, .docx, .doc, .txt, .xls, .xlsx, .ppt, .pptx files');
       return;
     }
 
@@ -166,7 +168,7 @@ const Documents = () => {
       // Prepare form data for API
       const formData = new FormData();
       const filesData = validFiles.map(file => ({
-        title: file.name.replace('.md', ''),
+        title: file.name,
         file: file
       }));
 
@@ -195,7 +197,7 @@ const Documents = () => {
       if (error.response?.data?.errors) {
         setUploadError(error.response.data.errors.join(', '));
       } else {
-        setUploadError('Failed to upload documents');
+        setUploadError('Failed to upload documents:', error);
       }
     } finally {
       setUploading(false);
@@ -225,7 +227,15 @@ const Documents = () => {
         formData.append(`files[${index}][file]`, file);
       });
 
-      const response = await api.post('/api/v2/documents', formData, {
+      const filesData = validFiles.map(file => ({
+        title: file.name,
+        file: file
+      }));
+
+      const response = await api.post('/documents', 
+        {
+          documents: { files: filesData }
+        }, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -235,15 +245,16 @@ const Documents = () => {
         setUploadError(response.data.errors.join(', '));
       } else {
         // Update documents list with new data
-        setDocuments(response.data.documents || []);
+        setDocuments([...documents, ...response.data.documents || []]);
         setUploadError('');
       }
     } catch (error) {
+      debugger
       console.error('Error uploading documents:', error);
       if (error.response?.data?.errors) {
         setUploadError(error.response.data.errors.join(', '));
       } else {
-        setUploadError('Failed to upload documents');
+        setUploadError('Failed to upload documents:',  error);
       }
     } finally {
       setUploading(false);
@@ -327,7 +338,7 @@ const Documents = () => {
                 <>
                   <i className="fas fa-cloud-upload-alt text-4xl text-primary mb-4"></i>
                   <h3 className="text-xl font-semibold text-primary mb-2">
-                    Drop Markdown files here
+                    Drop Documents here
                   </h3>
                   <p className="text-secondary">
                     or click to browse files
@@ -336,7 +347,7 @@ const Documents = () => {
               )}
             </div>
             <p className="text-sm text-secondary">
-              Only .md files are accepted (max 10MB)
+              Only .md, .pdf, .docx, .doc, .txt, .xls, .xlsx, .ppt, .pptx files are accepted (max 10MB)
             </p>
           </div>
           
@@ -349,7 +360,7 @@ const Documents = () => {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".md"
+            accept={'.md, .pdf, .docx, .doc, .txt, .xls, .xlsx, .ppt, .pptx'}
             multiple
             onChange={handleFileInput}
             className="hidden"
@@ -366,10 +377,7 @@ const Documents = () => {
           <div className="card-body">
             {loading ? (
               <div className="text-center py-8">
-                <i className="fas fa-spinner fa-spin text-4xl text-primary mb-4"></i>
-                <p className="text-secondary">
-                  Loading documents...
-                </p>
+                <LoadingIndicator size="medium" text="Loading documents..." />
               </div>
             ) : documents.length === 0 ? (
               <div className="text-center py-8">
@@ -406,13 +414,25 @@ const Documents = () => {
                     </div>
                     
                     <div className="flex items-center space-x-2">
-                      <button 
-                        className="btn btn-outline btn-sm"
-                        onClick={() => handleEditDocument(doc)}
-                      >
-                        <i className="fas fa-edit mr-1"></i>
-                        Edit
-                      </button>
+                      { doc.can_view && (
+                        <>
+                         <button 
+                          className="btn btn-outline btn-sm"
+                            onClick={() => navigate(`/viewer/${doc.id}`)}
+                          >
+                            <i className="fas fa-eye mr-1"></i>
+                            View
+                          </button>
+                          <button 
+                            className="btn btn-outline btn-sm"
+                            onClick={() => handleEditDocument(doc)}
+                          >
+                            <i className="fas fa-edit mr-1"></i>
+                            Edit
+                        </button>
+                        </>
+                       
+                      )}
                       <button 
                         className="btn btn-outline btn-sm"
                         onClick={() => handleDownloadDocument(doc)}

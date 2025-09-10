@@ -334,6 +334,43 @@ img.logo {
   }
 }
 
+/* Loading Indicator */
+.loading-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  backdrop-filter: blur(2px);
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.loading-text {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  animation: loading-pulse 2s ease-in-out infinite;
+}
+
+@keyframes loading-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 /* Drag and Drop Styles */
 .drag-drop-area {
   transition: all var(--transition-normal);
@@ -407,6 +444,13 @@ img.logo {
   flex-direction: column;
 }
 
+/* Document Viewer Styles */
+.document-viewer {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
 .document-header {
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border-light);
@@ -417,7 +461,33 @@ img.logo {
 
 .document-content {
   flex: 1;
-  overflow: hidden;
+  overflow-y: scroll;
+  padding-bottom: 6rem;
+}
+
+.document-viewer h1, .document-viewer h2, .document-viewer h3, .document-viewer h4, .document-viewer h5, .document-viewer h6 {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+.document-viewer p {
+  margin-bottom: 1rem;
+  line-height: 1.7;
+}
+
+.document-viewer code {
+  background: var(--color-neutral-100);
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--color-primary-600);
+}
+
+.document-viewer pre {
+  background: var(--color-neutral-100);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin: 1.5rem 0;
 }
 
 /* Editor Sidebar Styles */

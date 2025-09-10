@@ -1,3 +1,5 @@
+import LoadingIndicator from './LoadingIndicator';
+
 const LoadingSpinner = ({ message = "Loading..." }) => {
   return (
     <div className="container">
@@ -5,10 +7,7 @@ const LoadingSpinner = ({ message = "Loading..." }) => {
         <div className="column is-half text-center" style={{ marginTop: '4rem' }}>
           <div className="card">
             <div className="card-body">
-              <div className="spinner spinner-lg mb-4"></div>
-              <p className="text-lg text-secondary">
-                {message}
-              </p>
+              <LoadingIndicator size="large" text={message} />
             </div>
           </div>
         </div>
