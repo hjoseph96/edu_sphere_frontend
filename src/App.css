@@ -164,6 +164,31 @@
   gap: 0.5em;
 }
 
+.version-history-dropdown-content {
+  max-height: 400px;
+  max-width: 400px;
+  width: 400px;
+  overflow-y: auto;
+}
+
+.version-history-dropdown-content li {
+  border-bottom: 1px solid gray;
+  padding: 1.3em 1em;
+}
+
+.version-history-dropdown-content button.button {
+  background-color: transparent;
+}
+
+.version-history-dropdown-content button.button:hover {
+  background-color: transparent;
+}
+
+
+.version-history-dropdown-content li:last-child {
+  border-bottom: none;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .main-content {

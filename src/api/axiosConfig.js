@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: 'http://localhost:3000/api/v1',
+  baseURL: 'https://edu-sphere-api-f52fa37eb762.herokuapp.com/api/v1', // https://edu-sphere-api-f52fa37eb762.herokuapp.com
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -13,6 +13,7 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -26,6 +27,10 @@ api.interceptors.request.use(
 // Response interceptor to handle common errors
 api.interceptors.response.use(
   (response) => {
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token);
+    }
+
     return response;
   },
   (error) => {

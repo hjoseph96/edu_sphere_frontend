@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, version } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
@@ -26,6 +26,7 @@ const DocumentEditor = () => {
   const [documentTitle, setDocumentTitle] = useState('');
   const [lastUpdated, setLastUpdated] = useState('');
   const [isShareDropdownOpen, setIsShareDropdownOpen] = useState(false);
+  const [isVersionsDropdownOpen, setIsVersionsDropdownOpen] = useState(false);
   
   // Search functionality
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,10 +41,13 @@ const DocumentEditor = () => {
 
   const [documentEditors, setDocumentEditors] = useState([]);
   const [currentlyViewingUsers, setCurrentlyViewingUsers] = useState([]);
+  const [documentVersions, setDocumentVersions] = useState([]);
   
   // Auto-save state
   const [updateTimeout, setUpdateTimeout] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [lastSavedContent, setLastSavedContent] = useState('');
+  const [periodicSaveInterval, setPeriodicSaveInterval] = useState(null);
   
   // Mock data for users currently viewing/editing
   const [viewingUsers] = useState([
@@ -86,6 +90,7 @@ const DocumentEditor = () => {
       setMarkdownContent(fileContent);
       setLastUpdated(documentData.updated_at || documentData.created_at);
       setDocumentEditors(documentData.editors || []);
+      setDocumentVersions(documentData.versions || []);
       
       // Set editor expanded if user has edit permissions
       setIsEditorExpanded(canEdit);
@@ -115,6 +120,20 @@ const DocumentEditor = () => {
     setLastUpdated(new Date().toISOString());
     
     // Auto-save document
+    if (document_id && document_id !== 'new') {
+      updateDocument();
+    }
+  };
+
+  const handlePaste = (e) => {
+    // Auto-save document after paste
+    if (document_id && document_id !== 'new') {
+      updateDocument();
+    }
+  };
+
+  const handleCopy = (e) => {
+    // Auto-save document after copy (in case content was modified)
     if (document_id && document_id !== 'new') {
       updateDocument();
     }
@@ -198,62 +217,103 @@ const DocumentEditor = () => {
     setSelectedUser(null);
   };
 
+  const handleRestoreVersion = async (version) => {
+    try {
+      const response = await api.post(`/documents/${document_id}/restore_version`, {
+        version_id: version.id
+      });
+
+      if (response.data.document) {
+        // Update document with restored version
+        setDocument(response.data.document);
+        setDocumentTitle(response.data.document.title);
+        setMarkdownContent(response.data.document.markdown);
+        setLastUpdated(response.data.document.updated_at);
+        
+        // Update versions if provided
+        if (response.data.document.versions) {
+          setDocumentVersions(response.data.document.versions);
+        }
+        
+        // Update last saved content
+        setLastSavedContent(`$${response.data.document.markdown}`);
+      }
+      
+      // Close the dropdown
+      setIsVersionsDropdownOpen(false);
+      
+    } catch (error) {
+      console.error('Error restoring version:', error);
+      // You could add a toast notification here for error feedback
+    }
+  };
+
   // Auto-save document with debouncing
-  const updateDocument = async () => {
-    // Clear existing timeout
-    if (updateTimeout) {
-      clearTimeout(updateTimeout);
+  const updateDocument = async (force = false) => {
+    // Check if we should save based on character changes or forced save
+    const currentContent = `${documentTitle}${markdownContent}`;
+    const characterDiff = Math.abs(currentContent.length - lastSavedContent.length);
+    
+    if (!force && characterDiff < 40) {
+      return; // Don't save if less than 40 characters changed
     }
 
-    // Set new timeout for debounced save
-    const newTimeout = setTimeout(async () => {
-      try {
-        setIsSaving(true);
-        
-        const payload = {
-          document: {
-            title: documentTitle,
-            markdown: markdownContent
-          }
-        };
+    try {
+      setIsSaving(true);
+      
+      const payload = {
+        document: {
+          title: documentTitle,
+          markdown: markdownContent
+        }
+      };
 
-        await api.put(`/documents/${document_id}`, payload);
-        
-        // Update last updated time
-        setLastUpdated(new Date().toISOString());
-        
-      } catch (error) {
-        console.error('Error updating document:', error);
-        // You could add a toast notification here for error feedback
-      } finally {
-        setIsSaving(false);
-      }
-    }, 1000); // 1 second delay
+      const response = await api.put(`/documents/${document_id}`, payload);
 
-    setUpdateTimeout(newTimeout);
+      if (response.data.document.versions)
+        setDocumentVersions(response.data.document.versions);
+      
+      // Update last saved content
+      setLastSavedContent(currentContent);
+      
+      // Update last updated time
+      setLastUpdated(new Date().toISOString());
+      
+    } catch (error) {
+      console.error('Error updating document: ', error);
+      // You could add a toast notification here for error feedback
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  // Cleanup timeouts on unmount
+  // Initialize periodic save and cleanup on mount/unmount
   useEffect(() => {
-    return () => {
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
+    // Set up periodic save every 5 minutes (300,000 ms)
+    const interval = setInterval(() => {
+      if (document_id && document_id !== 'new') {
+        updateDocument(true); // Force save regardless of character count
       }
-      if (updateTimeout) {
-        clearTimeout(updateTimeout);
-      }
-    };
-  }, [searchTimeout, updateTimeout]);
+    }, 5 * 60 * 1000); // 5 minutes
 
-  const getShareIcon = (label) => {
-    switch (label) {
-      case 'Copy Link': return 'copy';
-      case 'Export PDF': return 'file-pdf';
-      case 'Export HTML': return 'code';
-      case 'Share via Email': return 'envelope';
-      default: return 'share-alt';
+    setPeriodicSaveInterval(interval);
+
+    // Initialize last saved content when document loads
+    if (document && document.title && document.markdown) {
+      setLastSavedContent(`${document.title}${document.markdown}`);
     }
-  };
+
+    return () => {
+      if (searchTimeout)
+        clearTimeout(searchTimeout);
+      
+      if (updateTimeout)
+        clearTimeout(updateTimeout);
+        
+      if (interval)
+        clearInterval(interval);
+    };
+  }, [document_id, document]);
 
   // Loading state
   if (loading) {
@@ -310,6 +370,8 @@ const DocumentEditor = () => {
                   type="text"
                   value={documentTitle}
                   onChange={handleTitleChange}
+                  onPaste={handlePaste}
+                  onCopy={handleCopy}
                   className="text-2xl font-bold text-primary bg-transparent border-none outline-none focus:outline-none focus:ring-2 focus:ring-primary-500 rounded"
                   disabled={!canEdit}
                 />
@@ -326,9 +388,26 @@ const DocumentEditor = () => {
                   <div className="text-sm text-secondary mt-1 document-editors">
                     <span className="font-bold">Editors:</span>
 
-                    <div className="flex -space-x-2 editors">
-                      { documentEditors.map((editor) => ( <img src={editor.avatar_url} alt={editor.first_name} className="user-avatar" /> )) }
-                    </div>
+                      <div className="flex -space-x-2 editors">
+                        { documentEditors.map((editor) => ( 
+                            <div 
+                              key={editor.id} 
+                              className="tooltip is-tooltip-bottom"
+                            >
+                              <img 
+                                src={editor.avatar_url} 
+                                alt={editor.first_name} 
+                                className="user-avatar" 
+                              />
+                              <div className="tooltip-content">
+                                {editor.first_name} {editor.last_name}
+                                <br />
+                                {editor.email}
+                              </div>
+                            </div>
+                          ))
+                        }
+                      </div>
                   </div>
                 )}
               </div>
@@ -336,6 +415,46 @@ const DocumentEditor = () => {
 
             {/* Right side - Share button and viewing users */}
             <div className="flex items-center space-x-4">
+              {/* Document Version History */}
+              <div className={`dropdown ${isVersionsDropdownOpen ? 'is-active' : ''}`}>
+                  <div className="dropdown-trigger">
+                    <button className="button is-outlined" onClick={() => setIsVersionsDropdownOpen(!isVersionsDropdownOpen)}>
+                      <i className="fas fa-history"></i>
+                      Version History
+                    </button>
+                  </div>
+                  <div className="dropdown-menu" id="version-history-dropdown-menu" role="menu">
+                    <div className="dropdown-content version-history-dropdown-content">
+                      <ul className="menu-list">
+                        {documentVersions.map((version) => (
+                          <li key={version.id} className="is-flex is-justify-content-space-between is-align-items-center">
+                             <div className="is-flex is-align-items-left">
+                               {(new Date(version.created_at)).toLocaleString('en-US', { 
+                                 year: 'numeric', 
+                                 month: 'long', 
+                                 day: 'numeric',
+                                 hour: 'numeric',
+                                 minute: '2-digit',
+                                 hour12: true
+                               })}
+                             </div>
+
+                             <div className="is-flex is-align-items-right">
+                               <button 
+                                 className="button is-small is-primary"
+                                 onClick={() => handleRestoreVersion(version)}
+                               >
+                                 <i className="fas fa-undo"></i>
+                                 Restore
+                               </button>
+                             </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+              </div>
+
               {/* Share Button with Dropdown */}
               <div className={`dropdown ${isShareDropdownOpen ? 'is-active' : ''}`}>
                 <div className="dropdown-trigger">
@@ -383,31 +502,38 @@ const DocumentEditor = () => {
                         </div>
                       ) : searchResults.length > 0 ? (
                         <ul className="menu-list">
-                          {searchResults.map((user) => {
-                            return (
-                              <li key={user.id} className="is-flex is-justify-content-space-between is-align-items-center">
-                                <div className="is-flex is-align-items-left">
-                                  <img src={user.avatar_url} alt={user.first_name} className="user-avatar" />
-                                </div>
+                           {searchResults.map((user) => {
+                             return (
+                               <li key={user.id} className="is-flex is-justify-content-space-between is-align-items-center">
+                                 <div className="is-flex is-align-items-left">
+                                   <div className="tooltip is-tooltip-right">
+                                     <img src={user.avatar_url} alt={user.first_name} className="user-avatar" />
+                                     <div className="tooltip-content">
+                                       {user.first_name} {user.last_name}
+                                       <br />
+                                       {user.email}
+                                     </div>
+                                   </div>
+                                 </div>
 
-                                <div>
-                                  <div className="has-text-weight-semibold">
-                                    {user.first_name} {user.last_name}
-                                  </div>
-                                  <div className="has-text-grey is-size-7">
-                                    {user.email}
-                                  </div>
-                                </div>
+                                 <div>
+                                   <div className="has-text-weight-semibold">
+                                     {user.first_name} {user.last_name}
+                                   </div>
+                                   <div className="has-text-grey is-size-7">
+                                     {user.email}
+                                   </div>
+                                 </div>
 
-                                <button
-                                  className="button is-small is-primary invite-btn"
-                                  onClick={() => handleInviteUser(user)}
-                                >
-                                  Invite
-                                </button>
-                              </li>
-                            );
-                          })}
+                                 <button
+                                   className="button is-small is-primary invite-btn"
+                                   onClick={() => handleInviteUser(user)}
+                                 >
+                                   Invite
+                                 </button>
+                               </li>
+                             );
+                           })}
                         </ul>
                       ) : searchQuery.trim().length > 0 ? (
                         <div className="has-text-centered py-4 has-text-grey">
@@ -474,6 +600,8 @@ const DocumentEditor = () => {
                     ref={textareaRef}
                     value={markdownContent}
                     onChange={handleMarkdownChange}
+                    onPaste={handlePaste}
+                    onCopy={handleCopy}
                     className="w-full h-full resize-none border-none outline-none font-mono text-sm leading-relaxed"
                     placeholder={isEditorExpanded ? "Start writing your Markdown here..." : ""}
                   />
