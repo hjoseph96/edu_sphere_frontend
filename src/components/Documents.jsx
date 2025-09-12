@@ -42,7 +42,7 @@ const Documents = () => {
 
   const handleEditDocument = async (document) => {
     // Navigate to DocumentEditor with just the document ID
-    navigate(`/editor/${document.id}`);
+    navigate(`/editor/${document.slug}`);
   };
 
   const handleDownloadDocument = async (document) => {
@@ -50,7 +50,7 @@ const Documents = () => {
       setDownloading(document.id);
       
       // Fetch the document as blob
-      const response = await api.get(`/documents/${document.id}/download`, {
+      const response = await api.get(`/documents/${document.slug}/download`, {
         responseType: 'blob'
       });
       
@@ -94,7 +94,7 @@ const Documents = () => {
 
     try {
       setDeleting(document.id);
-      await api.delete(`/documents/${document.id}`);
+      await api.delete(`/documents/${document.slug}`);
       
       // Remove the document from the local state
       setDocuments(prev => prev.filter(doc => doc.id !== document.id));
@@ -404,7 +404,7 @@ const Documents = () => {
                         <>
                          <button 
                           className="btn btn-outline btn-sm"
-                            onClick={() => navigate(`/viewer/${doc.id}`)}
+                            onClick={() => navigate(`/viewer/${doc.slug}`)}
                           >
                             <i className="fas fa-eye mr-1"></i>
                             View
@@ -503,7 +503,7 @@ const Documents = () => {
                         <>
                          <button 
                           className="btn btn-outline btn-sm"
-                            onClick={() => navigate(`/viewer/${doc.id}`)}
+                            onClick={() => navigate(`/viewer/${doc.slug}`)}
                           >
                             <i className="fas fa-eye mr-1"></i>
                             View
