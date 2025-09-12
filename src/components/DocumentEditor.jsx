@@ -109,9 +109,9 @@ const DocumentEditor = () => {
     setMarkdownContent(e.target.value);
     setLastUpdated(new Date().toISOString());
     
-    // Auto-save document
+    // Debounced auto-save document
     if (document_id && document_id !== 'new') {
-      updateDocument();
+      debouncedUpdate();
     }
   };
 
@@ -119,21 +119,21 @@ const DocumentEditor = () => {
     setDocumentTitle(e.target.value);
     setLastUpdated(new Date().toISOString());
     
-    // Auto-save document
+    // Debounced auto-save document
     if (document_id && document_id !== 'new') {
-      updateDocument();
+      debouncedUpdate();
     }
   };
 
   const handlePaste = (e) => {
-    // Auto-save document after paste
+    // Auto-save document after paste (immediate)
     if (document_id && document_id !== 'new') {
       updateDocument();
     }
   };
 
   const handleCopy = (e) => {
-    // Auto-save document after copy (in case content was modified)
+    // Auto-save document after copy (immediate)
     if (document_id && document_id !== 'new') {
       updateDocument();
     }
@@ -248,7 +248,22 @@ const DocumentEditor = () => {
     }
   };
 
-  // Auto-save document with debouncing
+  // Debounced update function
+  const debouncedUpdate = () => {
+    // Clear existing timeout
+    if (updateTimeout) {
+      clearTimeout(updateTimeout);
+    }
+
+    // Set new timeout for debounced save
+    const newTimeout = setTimeout(() => {
+      updateDocument();
+    }, 2000); // 2 second delay
+
+    setUpdateTimeout(newTimeout);
+  };
+
+  // Auto-save document with character change detection
   const updateDocument = async (force = false) => {
     // Check if we should save based on character changes or forced save
     const currentContent = `${documentTitle}${markdownContent}`;
